@@ -2,6 +2,8 @@ import input_data
 import tensorflow as tf
 from tensorflow.python.client import timeline
 import time
+import numpy as np
+import random
 
 def weight_variable(shape):
 	initial = tf.truncated_normal(shape, stddev=0.1)
@@ -17,21 +19,65 @@ def conv2d(x, W):
 def max_pool_2x2(x):
 	return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
-start = time.time() 
+def get_train(dir_name="MNIST_data/mnist_train.csv"):	
+	
+	print("Start reading", dir_name, "...")
+	
+	f = open(dir_name,'r')
+	data=[]
+	for line in f.readlines():
+		data.append(line.strip().split(','))
+	f.close()
+	
+	data = np.array(data).astype(np.float32)
+	
+	example = data[:,1:28*28+1]
+	label = data[:,0]
+	
+	label_onehot=np.zeros((len(label),10))
+	
+	for i in range(len(label)):
+		label_onehot[i][int(label[i])] = 1
+	
+	#print(label[0:5])
+	#print(label_onehot[0:5])
+	
+	#label = label.reshape(label.shape[0],1)
+	
+	return example, label_onehot
+	
+def get_batch(example, label, batch_size=200):
 
+	example_batch=[]
+	label_batch=[]
+
+	
+	for i in range(batch_size):
+		index = random.randrange(0, len(example))
+		example_batch.append(example[index])
+		label_batch.append(label[index])
+	'''
+	for i in range(batch_index*batch_size, (batch_index+1)*batch_size):
+		example_batch.append(example[i])
+		label_batch.append(label[i])
+	'''	
+	return example_batch, label_batch	
+
+#start = time.time() 
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
+#end = time.time() 
+#secs = end - start 
+#msecs = secs * 1000 # millisecs 
+#print( 'elapsed time: %f ms' %msecs)
 
-end = time.time() 
-secs = end - start 
-msecs = secs * 1000 # millisecs 
-print( 'elapsed time: %f ms' %msecs)
-
+example, label = get_train()
 sess = tf.InteractiveSession()
 
 with tf.name_scope('inputs'):
-	x = tf.placeholder("float", shape=[None, 784], name='x_in')
-	y_ = tf.placeholder("float", shape=[None, 10], name='y_in')
-
+	x = tf.placeholder("float32", shape=[None, 784], name='x_in')
+	#y_raw = tf.placeholder("uint8", shape=[None, 1])
+	#y_ = tf.cast(tf.one_hot(y_raw, depth=10),tf.float32)
+	y_ = tf.placeholder("float32", shape=[None, 10])
 	
 sess.run(tf.initialize_all_variables())
 
@@ -45,7 +91,6 @@ with tf.name_scope('conv_1'):
 	
 with tf.name_scope('pooling_1'):
 	h_pool1 = max_pool_2x2(h_conv1)
-	
 
 with tf.name_scope('conv_2'):
 	W_conv2 = weight_variable([5, 5, 32, 64])
@@ -82,11 +127,13 @@ with tf.name_scope('Accuarcy'):
 sess.run(tf.initialize_all_variables())
 
 startTime = time.time()  
-for i in range(1000):
-	batch = mnist.train.next_batch(2000)
-	if i%100 == 0:
-		train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
-		print ("step %d, training accuracy %g"%(i, train_accuracy))
+for i in range(10000):
+	#batch = mnist.train.next_batch(2000)
+	batch = get_batch(example, label)
+	#print(batch)
+	#if i%100 == 0:
+	train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
+	print ("step %d, training accuracy %g"%(i, train_accuracy))
 	options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
 	run_metadata = tf.RunMetadata()
 	with tf.name_scope('train'):
@@ -103,7 +150,7 @@ chrome_trace = fetched_timeline.generate_chrome_trace_format()
 with open('timeline_01.json', 'w') as f:
 	f.write(chrome_trace)
 	
-print ("test accuracy %g"%accuracy.eval(feed_dict={x: mnist.test.images, y_: mnist.test.labels, keep_prob: 1.0}))
+#print ("test accuracy %g"%accuracy.eval(feed_dict={x: mnist.test.images, y_raw: mnist.test.labels, keep_prob: 1.0}))
 
 sess = tf.Session() # get session
 # tf.train.SummaryWriter soon be deprecated, use following
