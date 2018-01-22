@@ -47,7 +47,80 @@ def get_train(dir_name="MNIST_data/mnist_train.csv"):
 	#label = label.reshape(label.shape[0],1)
 	
 	return example, label_onehot
+
+#
+def get_line_offset(dir_name="MNIST_data/mnist_train.csv"):
+
+	print("Start reading", dir_name, "...")
+	f = open(dir_name,'r')
 	
+	# Read in the file once and build a list of line offsets
+	line_offset = []
+	offset = 0
+	for line in f:
+		line_offset.append(offset)
+		offset += len(line)
+	
+	#print('line offst', line_offset)
+	
+	return line_offset
+
+def get_example(index, line_offset, dir_name="MNIST_data/mnist_train.csv"):	
+	
+	#print("Start reading", dir_name, "...")
+	
+	f = open(dir_name,'r')
+	
+	#f.seek(index*(28*28+1),0)
+	f.seek(line_offset[index])
+	
+	line = f.readline()
+	#print(line)
+	data = []
+	data.append(line.strip('\n').split(','))
+	#print(data)
+	f.close()
+	
+	data = np.array(data).astype(np.float32)
+	
+	#print('data shape', data.shape)
+	
+	example = data[:,1:28*28+1]
+	label = data[:,0]
+	
+	example /= 255
+	
+	label_onehot=np.zeros((len(label),10))
+	
+	for i in range(len(label)):
+		label_onehot[i][int(label[i])] = 1
+	
+	return example[0], label_onehot[0]	
+
+#Using get example
+def get_batch2(line_offset, batch_size=200):
+
+	example_batch=[]
+	label_batch=[]
+
+	
+	for i in range(batch_size):
+		index = random.randrange(0, 60000)
+		#print(index)
+		example, label_onehot = get_example(index, line_offset, dir_name="MNIST_data/mnist_train.csv")
+		example_batch.append(example)
+		label_batch.append(label_onehot)
+		
+	example_batch = np.array(example_batch).astype(np.float32)
+	label_batch = np.array(label_batch).astype(np.float32)
+	'''
+	for i in range(batch_index*batch_size, (batch_index+1)*batch_size):
+		example_batch.append(example[i])
+		label_batch.append(label[i])
+	'''	
+	return example_batch, label_batch	
+
+
 def get_batch(example, label, batch_size=200):
 
 	example_batch=[]
@@ -67,7 +140,7 @@ def get_batch(example, label, batch_size=200):
 		example_batch.append(example[i])
 		label_batch.append(label[i])
 	'''	
-	return example_batch, label_batch	
+	return example_batch, label_batch		
 
 #start = time.time() 
 mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
@@ -76,7 +149,8 @@ mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 #msecs = secs * 1000 # millisecs 
 #print( 'elapsed time: %f ms' %msecs)
 
-example, label = get_train()
+#example, label = get_train()
+line_offset = get_line_offset()
 t_example, t_label = get_train("MNIST_data/mnist_test.csv")
 sess = tf.InteractiveSession()
 
@@ -135,13 +209,14 @@ sess.run(tf.initialize_all_variables())
 
 startTime = time.time() 
 loadtime = 0
-for i in range(10000):
+for i in range(1000):
 	#batch = mnist.train.next_batch(200)
 	start_getbatch = time.time()  
-	batch = get_batch(example, label, 200)
+	#batch = get_batch(example, label, 200)
+	batch = get_batch2(line_offset, 200)
 	loadtime += (time.time()-start_getbatch)
 	#print(batch[0], batch[1])
-	if i%100 == 0:
+	if i%10 == 0:
 		train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
 		test_accuracy = accuracy.eval(feed_dict={x: t_example, y_: t_label, keep_prob: 1.0})
 		print ("step %d, training accuracy %g testing accuracy %g"%(i, train_accuracy, test_accuracy))
