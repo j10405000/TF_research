@@ -46,7 +46,9 @@ def get_train(dir_name="MNIST_data/mnist_train.csv"):
 	
 	#label = label.reshape(label.shape[0],1)
 	
-	return example, label_onehot
+	label = label.reshape((-1, 1))
+	
+	return example, label
 
 #
 def get_line_offset(dir_name="MNIST_data/mnist_train.csv"):
@@ -64,6 +66,7 @@ def get_line_offset(dir_name="MNIST_data/mnist_train.csv"):
 	#print('line offst', line_offset)
 	
 	return line_offset
+
 
 def get_example(index, line_offset, dir_name="MNIST_data/mnist_train.csv"):	
 	
@@ -149,16 +152,17 @@ mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 #msecs = secs * 1000 # millisecs 
 #print( 'elapsed time: %f ms' %msecs)
 
-#example, label = get_train()
+example, label = get_train()
 line_offset = get_line_offset()
 t_example, t_label = get_train("MNIST_data/mnist_test.csv")
 sess = tf.InteractiveSession()
 
 with tf.name_scope('inputs'):
 	x = tf.placeholder("float32", shape=[None, 784], name='x_in')
-	#y_raw = tf.placeholder("uint8", shape=[None, 1])
-	#y_ = tf.cast(tf.one_hot(y_raw, depth=10),tf.float32)
-	y_ = tf.placeholder("float32", shape=[None, 10])
+	y_raw = tf.placeholder("uint8", shape=[None, 1])
+	y_onehot = tf.cast(tf.one_hot(y_raw, depth=10),tf.float32)
+	y_ = tf.reshape(y_onehot, (-1, 10))
+	#y_ = tf.placeholder("float32", shape=[None, 10])
 	
 sess.run(tf.initialize_all_variables())
 
@@ -210,20 +214,20 @@ sess.run(tf.initialize_all_variables())
 startTime = time.time() 
 loadtime = 0
 for i in range(1000):
+	start_getbatch = time.time() 
 	#batch = mnist.train.next_batch(200)
-	start_getbatch = time.time()  
-	#batch = get_batch(example, label, 200)
-	batch = get_batch2(line_offset, 200)
+	batch = get_batch(example, label, 200)
+	#batch = get_batch2(line_offset, 200)
 	loadtime += (time.time()-start_getbatch)
 	#print(batch[0], batch[1])
 	if i%10 == 0:
-		train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
-		test_accuracy = accuracy.eval(feed_dict={x: t_example, y_: t_label, keep_prob: 1.0})
+		train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_raw: batch[1], keep_prob: 1.0})
+		test_accuracy = accuracy.eval(feed_dict={x: t_example, y_raw: t_label, keep_prob: 1.0})
 		print ("step %d, training accuracy %g testing accuracy %g"%(i, train_accuracy, test_accuracy))
 	options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
 	run_metadata = tf.RunMetadata()
 	with tf.name_scope('train'):
-		sess.run(train_step,feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5}, options=options, run_metadata=run_metadata)
+		sess.run(train_step,feed_dict={x: batch[0], y_raw: batch[1], keep_prob: 0.5}, options=options, run_metadata=run_metadata)
 		end = time.time() 
 		#print("elapsed time: %f ms" %((end-start)*1000))
 		#train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5}, options=options, run_metadata=run_metadata)
