@@ -34,6 +34,8 @@ def get_train(dir_name="MNIST_data/mnist_train.csv"):
 	example = data[:,1:28*28+1]
 	label = data[:,0]
 	
+	example /= 255
+	
 	label_onehot=np.zeros((len(label),10))
 	
 	for i in range(len(label)):
@@ -54,8 +56,12 @@ def get_batch(example, label, batch_size=200):
 	
 	for i in range(batch_size):
 		index = random.randrange(0, len(example))
+		#print(index)
 		example_batch.append(example[index])
 		label_batch.append(label[index])
+		
+	example_batch = np.array(example_batch).astype(np.float32)
+	label_batch = np.array(label_batch).astype(np.float32)
 	'''
 	for i in range(batch_index*batch_size, (batch_index+1)*batch_size):
 		example_batch.append(example[i])
@@ -71,6 +77,7 @@ mnist = input_data.read_data_sets('MNIST_data', one_hot=True)
 #print( 'elapsed time: %f ms' %msecs)
 
 example, label = get_train()
+t_example, t_label = get_train("MNIST_data/mnist_test.csv")
 sess = tf.InteractiveSession()
 
 with tf.name_scope('inputs'):
@@ -126,14 +133,18 @@ with tf.name_scope('Accuarcy'):
 	accuracy = tf.reduce_mean(tf.cast(correct_prediction, "float"))
 sess.run(tf.initialize_all_variables())
 
-startTime = time.time()  
+startTime = time.time() 
+loadtime = 0
 for i in range(10000):
-	#batch = mnist.train.next_batch(2000)
-	batch = get_batch(example, label)
-	#print(batch)
-	#if i%100 == 0:
-	train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
-	print ("step %d, training accuracy %g"%(i, train_accuracy))
+	#batch = mnist.train.next_batch(200)
+	start_getbatch = time.time()  
+	batch = get_batch(example, label, 200)
+	loadtime += (time.time()-start_getbatch)
+	#print(batch[0], batch[1])
+	if i%100 == 0:
+		train_accuracy = accuracy.eval(feed_dict={x:batch[0], y_: batch[1], keep_prob: 1.0})
+		test_accuracy = accuracy.eval(feed_dict={x: t_example, y_: t_label, keep_prob: 1.0})
+		print ("step %d, training accuracy %g testing accuracy %g"%(i, train_accuracy, test_accuracy))
 	options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
 	run_metadata = tf.RunMetadata()
 	with tf.name_scope('train'):
@@ -142,7 +153,7 @@ for i in range(10000):
 		#print("elapsed time: %f ms" %((end-start)*1000))
 		#train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5}, options=options, run_metadata=run_metadata)
 
-print("Time taken: %f" % (time.time() - startTime))
+print("Total time: %f Loadtime: %f" % ((time.time() - startTime), loadtime))
 
 # Create the Timeline object, and write it to a json file
 fetched_timeline = timeline.Timeline(run_metadata.step_stats)
@@ -150,7 +161,7 @@ chrome_trace = fetched_timeline.generate_chrome_trace_format()
 with open('timeline_01.json', 'w') as f:
 	f.write(chrome_trace)
 	
-#print ("test accuracy %g"%accuracy.eval(feed_dict={x: mnist.test.images, y_raw: mnist.test.labels, keep_prob: 1.0}))
+#print ("test accuracy %g"%accuracy.eval(feed_dict={x: example, y_: label, keep_prob: 1.0}))
 
 sess = tf.Session() # get session
 # tf.train.SummaryWriter soon be deprecated, use following
